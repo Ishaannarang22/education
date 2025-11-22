@@ -1,29 +1,83 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { LayoutDashboard, Clock, BookOpen, Brain, Code, CheckCircle, Target, Zap, ChevronRight, User, Menu, X } from 'lucide-react';
 
 // --- Firebase Imports and Setup (MANDATORY for stateful apps) ---
 // Note: These imports are required for a runnable React file that uses Firestore.
 // The actual initialization logic will run inside the useEffect.
-import { initializeApp } from 'firebase/app';
+import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
 
+type Mastery = {
+  overallScore: number;
+  topicsMastered: number;
+  hoursThisWeek: number;
+};
+
+type Course = {
+  id: number;
+  name: string;
+  progress: number;
+  due: string;
+  focus: string;
+};
+
+type TaskType = 'assignment' | 'assessment' | 'video' | 'coding' | 'task';
+type Urgency = 'high' | 'medium' | 'low';
+
+type Task = {
+  id: number;
+  title: string;
+  courseId: number;
+  type: TaskType;
+  date: string;
+  urgency: Urgency;
+};
+
+type StatCardProps = {
+  icon: LucideIcon;
+  title: string;
+  value: string | number;
+  color: string;
+};
+
+type ProgressBarProps = {
+  progress: number;
+};
+
+type TaskItemProps = {
+  task: Task;
+};
+
+type SidebarProps = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+type NavLink = {
+  name: string;
+  icon: LucideIcon;
+  href: string;
+  current: boolean;
+};
+
 // Mock data for the dashboard (would be fetched from backend services)
-const mockCourses = [
+const mockCourses: Course[] = [
   { id: 1, name: 'CS 101: Introduction to Programming', progress: 75, due: 'Dec 15', focus: 'Data Structures' },
   { id: 2, name: 'History 205: World Civilizations', progress: 40, due: 'Dec 22', focus: 'Renaissance Art' },
   { id: 3, name: 'Math 310: Calculus III', progress: 92, due: 'Dec 8', focus: 'Vector Fields' },
 ];
 
-const mockUpcomingTasks = [
+const mockUpcomingTasks: Task[] = [
   { id: 101, title: 'Final Project Submission', courseId: 1, type: 'assignment', date: '2025-12-15', urgency: 'high' },
   { id: 102, title: 'Practice Quiz: Loops & Functions', courseId: 1, type: 'assessment', date: '2025-11-25', urgency: 'medium' },
   { id: 103, title: 'Watch: The French Revolution (Video Segment 3)', courseId: 2, type: 'video', date: '2025-11-28', urgency: 'low' },
   { id: 104, title: 'Coding Challenge: Binary Search Tree', courseId: 1, type: 'coding', date: '2025-12-05', urgency: 'high' },
 ];
 
-const initialMastery = {
+const initialMastery: Mastery = {
   overallScore: 78,
   topicsMastered: 12,
   hoursThisWeek: 6.5,
@@ -32,7 +86,7 @@ const initialMastery = {
 // --- Helper Components ---
 
 // Component for displaying key stats in the header
-const StatCard = ({ icon: Icon, title, value, color }) => (
+const StatCard: React.FC<StatCardProps> = ({ icon: Icon, title, value, color }) => (
   <div className="bg-white p-4 rounded-xl shadow-lg flex items-center space-x-4">
     <div className={`p-3 rounded-full bg-opacity-20 ${color}`}>
       <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
@@ -45,7 +99,7 @@ const StatCard = ({ icon: Icon, title, value, color }) => (
 );
 
 // Progress Bar Component
-const ProgressBar = ({ progress }) => (
+const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => (
     <div className="w-full bg-gray-200 rounded-full h-2.5">
         <div 
             className="h-2.5 rounded-full transition-all duration-500 ease-out" 
@@ -55,7 +109,7 @@ const ProgressBar = ({ progress }) => (
 );
 
 // Task Item Component
-const TaskItem = ({ task }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     let icon, urgencyColor, typeLabel;
     
     switch (task.type) {
@@ -120,7 +174,7 @@ const TaskItem = ({ task }) => {
 };
 
 // Navigation Links Data
-const navLinks = [
+const navLinks: NavLink[] = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '#dashboard', current: true },
     { name: 'Course Hub', icon: BookOpen, href: '#courses', current: false },
     { name: 'Adaptive Planner', icon: Zap, href: '#planner', current: false },
@@ -129,7 +183,7 @@ const navLinks = [
 ];
 
 // Sidebar Component
-const Sidebar = ({ isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     return (
         <>
             {/* Mobile overlay */}
@@ -186,15 +240,15 @@ const Sidebar = ({ isOpen, onClose }) => {
 };
 
 
-const App = () => {
-    const [userId, setUserId] = useState(null);
-    const [isAuthReady, setIsAuthReady] = useState(false);
-    const [mastery, setMastery] = useState(initialMastery);
-    const [upcomingTasks, setUpcomingTasks] = useState(mockUpcomingTasks);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+const App: React.FC = () => {
+    const [userId, setUserId] = useState<string | null>(null);
+    const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
+    const [mastery, setMastery] = useState<Mastery>(initialMastery);
+    const [upcomingTasks, setUpcomingTasks] = useState<Task[]>(mockUpcomingTasks);
+    const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
     
     // Function to calculate mastery color
-    const getMasteryColor = (score) => {
+    const getMasteryColor = (score: number) => {
         if (score >= 85) return 'bg-emerald-500';
         if (score >= 70) return 'bg-amber-500';
         return 'bg-red-500';
@@ -202,12 +256,24 @@ const App = () => {
 
     // Firebase Initialization and Authentication
     useEffect(() => {
+        let unsubscribeAuth: (() => void) | undefined;
+
         const initFirebase = async () => {
             try {
                 // Global variables provided by the Canvas environment
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                const appId =
+                    typeof window !== 'undefined' && typeof (window as any).__app_id === 'string'
+                        ? (window as any).__app_id
+                        : 'default-app-id';
+                const rawFirebaseConfig =
+                    typeof window !== 'undefined' ? (window as any).__firebase_config : undefined;
+                const firebaseConfig: FirebaseOptions = rawFirebaseConfig
+                    ? (JSON.parse(rawFirebaseConfig) as FirebaseOptions)
+                    : ({} as FirebaseOptions);
+                const initialAuthToken =
+                    typeof window !== 'undefined' && typeof (window as any).__initial_auth_token === 'string'
+                        ? (window as any).__initial_auth_token
+                        : null;
                 
                 if (Object.keys(firebaseConfig).length === 0) {
                     console.warn("Firebase configuration missing; running in demo mode.");
@@ -227,7 +293,7 @@ const App = () => {
                 }
 
                 // Set up Auth State Listener
-                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                unsubscribeAuth = onAuthStateChanged(auth, (user) => {
                     if (user) {
                         setUserId(user.uid);
                         // Start listening to the user's data (e.g., mastery stats)
@@ -235,16 +301,34 @@ const App = () => {
                         const userDocRef = doc(db, userDocPath);
 
                         // Example Firestore listener for real-time updates
-                        onSnapshot(userDocRef, (docSnap) => {
-                            if (docSnap.exists()) {
-                                setMastery(docSnap.data());
-                            } else {
-                                // Initialize user stats if they don't exist
-                                setMastery(initialMastery);
+                        onSnapshot(
+                            userDocRef,
+                            (docSnap) => {
+                                if (docSnap.exists()) {
+                                    const data = docSnap.data() as Partial<Mastery> | undefined;
+                                    if (
+                                        data &&
+                                        typeof data.overallScore === 'number' &&
+                                        typeof data.topicsMastered === 'number' &&
+                                        typeof data.hoursThisWeek === 'number'
+                                    ) {
+                                        setMastery({
+                                            overallScore: data.overallScore,
+                                            topicsMastered: data.topicsMastered,
+                                            hoursThisWeek: data.hoursThisWeek,
+                                        });
+                                    } else {
+                                        setMastery(initialMastery);
+                                    }
+                                } else {
+                                    // Initialize user stats if they don't exist
+                                    setMastery(initialMastery);
+                                }
+                            },
+                            (error) => {
+                                console.error("Error listening to mastery stats:", error);
                             }
-                        }, (error) => {
-                            console.error("Error listening to mastery stats:", error);
-                        });
+                        );
                         
                     } else {
                         setUserId(null);
@@ -253,8 +337,6 @@ const App = () => {
                     setIsAuthReady(true);
                 });
 
-                return () => unsubscribe();
-
             } catch (error) {
                 console.error("Firebase initialization or authentication failed:", error);
                 setIsAuthReady(true);
@@ -262,6 +344,11 @@ const App = () => {
         };
 
         initFirebase();
+        return () => {
+            if (unsubscribeAuth) {
+                unsubscribeAuth();
+            }
+        };
     }, []);
 
     if (!isAuthReady) {
@@ -343,7 +430,7 @@ const App = () => {
                                 </h2>
                                 <div className="space-y-4">
                                     {upcomingTasks
-                                        .sort((a, b) => new Date(a.date) - new Date(b.date))
+                                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                                         .map(task => <TaskItem key={task.id} task={task} />)
                                     }
                                 </div>
